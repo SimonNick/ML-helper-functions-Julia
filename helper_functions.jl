@@ -1,3 +1,7 @@
+"""
+Author: Simon Lehnerer
+"""
+
 using Random
 
 
@@ -144,6 +148,11 @@ Returns a k-fold split of a range from 1 to n
 # Examples
 ```julia-repl
 julia> k_fold_indices(8, 4)
+4-element Array{Any,1}:
+ ([1, 2, 3, 4, 5, 6], 7:8)
+ ([1, 2, 3, 4, 7, 8], 5:6)
+ ([1, 2, 5, 6, 7, 8], 3:4)
+ ([3, 4, 5, 6, 7, 8], 1:2)
 ```
 """
 function k_fold_indices(n::Int64, K::Int64; shuffle::Bool=false)
@@ -332,3 +341,5 @@ function not_converged(accuracies::AbstractVector; number_iterations::Int64=10, 
     end
     true
 end
+
+nothing
