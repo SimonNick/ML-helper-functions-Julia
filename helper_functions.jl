@@ -2,33 +2,61 @@ using Random
 
 
 """
-Splits a list of indices in a list of training indices and test indices
+Splits an array of indices into a training and test array
 
 # Arguments
-- `indices::AbstractVector`: the list of indices to split
-- `train_size::Float64=0.80`: the relative size of the training set
-- `shuffle::Bool=true`: whether to sample the indices randomly
+- `indices::AbstractVector`: the array of indices to split
+- `train_size::Float64`: the relative size of the training set
+- `shuffle::Bool=false`: if true, the array is shuffled before splitting
+
+# Examples
+```julia-repl
+julia> train_test_split_indices(1:10, 0.8)
+(1:8, 9:10)
+
+julia> train_test_split_indices(1:10, 0.6, shuffle=true)
+([1, 3, 4, 9, 6, 7], [8, 2, 10, 5])
+```
 """
-function train_test_split_indices(indices::AbstractVector; train_size::Float64=0.80, shuffle::Bool=true)
+function train_test_split_indices(indices::AbstractVector, train_size::Float64; shuffle::Bool=false)
     
-    @assert 0 <= train_size <= 1
+    if !(0 <= train_size <= 1)
+        error("train_size must be in [0,1]")
+    end
     
     n = length(indices)
     indices_copy = shuffle ? Random.shuffle(indices) : deepcopy(indices)
     split_index = round(Int, n * train_size)
-    train_indices = indices_copy[1:split_index]
-    test_indices = indices_copy[(split_index + 1):n]
+    train_indices = split_index > 0 ? indices_copy[1:split_index] : []
+    test_indices = split_index < n ? indices_copy[(split_index + 1):n] : []
     
-    return train_indices, test_indices
+    train_indices, test_indices
     
 end
 
 
 """
-Proxy for train_test_split_indices(1:n, train_size=train_size, shuffle=shuffle)
+Splits a range from 1 to n into a training and test array
+
+# Arguments
+- `n::Int64`: the end of the range
+- `train_size::Float64`: the relative size of the training set
+- `shuffle::Bool=false`: if true, the range is shuffled before splitting
+
+# Examples
+```julia-repl
+julia> train_test_split_indices(10, 0.8)
+(1:8, 9:10)
+
+julia> train_test_split_indices(10, 0.6, shuffle=true)
+([1, 3, 4, 9, 6, 7], [8, 2, 10, 5])
+```
 """
-function train_test_split_indices(n::Int64; train_size::Float64=0.80, shuffle::Bool=true)
-    return train_test_split_indices(1:n, train_size=train_size, shuffle=shuffle)
+function train_test_split_indices(n::Int64, train_size::Float64; shuffle::Bool=false)
+    if n <= 0
+        error("n must be positive")
+    end
+    train_test_split_indices(1:n, train_size, shuffle=shuffle)
 end
 
 
@@ -37,34 +65,57 @@ Splits a dataset (X,y) into training data and test data
 
 # Arguments
 - `X::AbstractArray`: stacked matrix of input variables
-- `y::AbstractVector`: vector of target variables
-- `train_size::Float64=0.80`: the relative size of the training set
-- `shuffle::Bool=true`: whether to sample the dataset randomly
+- `y::AbstractVector`: vector of output variables
+- `train_size::Float64`: the relative size of the training set
+- `shuffle::Bool=false`: if true, X and y are shuffled before splitting
+
+# Examples
+```julia-repl
+julia> X = [1 2 3; 4 5 6; 7 8 9; 10 11 12]; y = [13, 14, 15, 16];
+julia> train_test_split(X, y, 0.75)
+([1 2 3; 4 5 6; 7 8 9], [10 11 12], [13, 14, 15], [16])
+```
 """
-function train_test_split(X::AbstractArray, y::AbstractVector; train_size::Float64=0.8, shuffle::Bool=true)
+function train_test_split(X::AbstractArray, y::AbstractVector, train_size::Float64; shuffle::Bool=false)
     
-    @assert size(X)[1] == length(y)
-    @assert 0 <= train_size <= 1
+    if size(X)[1] != length(y)
+        error("number of rows of X must be equal to the length of y")
+    end
+    if !(0 <= train_size <= 1)
+        error("train_size must be in [0,1]")
+    end
     
-    train_indices, test_indices = train_test_split_indices(1:length(y), train_size, shuffle)
+    train_indices, test_indices = train_test_split_indices(length(y), train_size, shuffle=shuffle)
     X_copy = deepcopy(X)
     y_copy = deepcopy(y)
+
     X_copy[train_indices, :], X_copy[test_indices, :], y_copy[train_indices], y_copy[test_indices]
 
 end
 
 
 """
-Creates a set of k-fold training and validations sets of the indices
+Returns a k-fold split of an array of indices
 
 # Arguments
-- `indices::AbstractVector`: the list of indices to split
+- `indices::AbstractVector`: the array to split
 - `K::Int64`: the number of splits
-- `shuffle::Bool=true`: whether to sample the indices randomly
+- `shuffle::Bool=false`: if true, the array is shuffled before splitting
+
+# Examples
+```julia-repl
+julia> indices = [7, 5, 4, 1, 2, 3];
+julia> k_fold_indices(indices, 3)
+([7, 5, 4, 1], [2, 3])
+([7, 5, 2, 3], [4, 1])
+([4, 1, 2, 3], [7, 5])
+```
 """
 function k_fold_indices(indices::AbstractVector, K::Int64; shuffle::Bool=false)
 
-    @assert 0 < K <= length(indices)
+    if !(0 < K <= length(indices))
+        error("K must be in [1, length(indices)]")
+    end
      
     n = length(indices)
     indices_copy = shuffle ? Random.shuffle(indices) : deepcopy(indices)
@@ -73,8 +124,8 @@ function k_fold_indices(indices::AbstractVector, K::Int64; shuffle::Bool=false)
     
     for k in 1:K
         validation_indices = indices_copy[round(Int, (k-1)/K*n)+1:round(Int, k/K*n)]
-        training_indices = indices_copy[setdiff(1:end, validation_indices)]
-        append!(output, [(training_indices, validation_indices)])
+        training_indices = setdiff(indices_copy, validation_indices)
+        prepend!(output, [(training_indices, validation_indices)])
     end
     
     output
@@ -83,35 +134,62 @@ end
 
 
 """
-Proxy for k_fold_indices(1:n, K, shuffle=shuffle)
+Returns a k-fold split of a range from 1 to n
+
+# Arguments
+- `n::Int64`: the end of the range
+- `K::Int64`: the number of splits
+- `shuffle::Bool=false`: if true, the range is shuffled before splitting
+
+# Examples
+```julia-repl
+julia> k_fold_indices(8, 4)
+```
 """
 function k_fold_indices(n::Int64, K::Int64; shuffle::Bool=false)
+    if n <= 0
+        error("n must be positive")
+    end
     k_fold_indices(1:n, K, shuffle=shuffle)
 end
     
 
 """
-Creates a set of k-fold training and validations sets of the dataset (X,y)
+Returns a k-fold split of the dataset (X,y)
 
 # Arguments
 - `X::AbstractArray`: stacked matrix of input variables
-- `y::AbstractVector`: vector of target variables
+- `y::AbstractVector`: vector of output variables
 - `K::Int64`: the number of splits
-- `shuffle=true::Bool`: whether to sample the dataset randomly
+- `shuffle::Bool=false`: if true, X and y are shuffled before splitting
+
+# Examples
+```julia-repl
+julia> X = [1 2 3; 4 5 6; 7 8 9; 10 11 12]; y = [13, 14, 15, 16];
+julia> k_fold(X, y, 4)
+([1 2 3; 4 5 6; 7 8 9], [10 11 12], [13, 14, 15], [16])
+([1 2 3; 4 5 6; 10 11 12], [7 8 9], [13, 14, 16], [15])
+([1 2 3; 7 8 9; 10 11 12], [4 5 6], [13, 15, 16], [14])
+([4 5 6; 7 8 9; 10 11 12], [1 2 3], [14, 15, 16], [13])
+```
 """
 function k_fold(X::AbstractArray, y::AbstractVector, K::Int64; shuffle::Bool=false)
      
-    @assert size(X)[1] == length(y)
-    @assert 0 < K <= length(y)
+    if size(X)[1] != length(y)
+        error("number of rows of X must be equal to the length of y")
+    end
+    if !(0 < K <= length(y))
+        error("K must be in [1, length(y)]")
+    end
 
     X_copy = deepcopy(X)
     y_copy = deepcopy(y)
+
+    output = []
     
-    for (training_indices, validation_indices) in 1:k_fold_indices(1:length(y), K, shuffle)
-    
-        X_train, X_validation = X_copy[setdiff(1:end, validation_indices), :], X_copy[validation_indices, :]
-        y_train, y_validation = y_copy[setdiff(1:end, validation_indices)], y_copy[validation_indices]
-        
+    for (training_indices, validation_indices) in k_fold_indices(length(y), K, shuffle=shuffle)
+        X_train, X_validation = X_copy[training_indices, :], X_copy[validation_indices, :]
+        y_train, y_validation = y_copy[training_indices], y_copy[validation_indices]
         append!(output, [(X_train, X_validation, y_train, y_validation)])
     end
     
@@ -126,8 +204,21 @@ Calculates the mean squared error (MSE)
 # Arguments
 - `y::AbstractVector`: vector of the correct target variables
 - `f_y::AbstractVector`: vector of the predicted target variables
+
+# Examples
+```julia-repl
+julia> y = [0, 1, 2]; f_y = [2, 0, 1];
+julia> MSE(y, f_y)
+2.0
+```
 """
 function MSE(y::AbstractVector, f_y::AbstractVector)
+    if length(y) == 0 || length(f_y) == 0
+        error("y and f_y must not be empty")
+    end
+    if length(y) != length(f_y)
+        error("y and f_y must have the same length")
+    end
     sum((y - f_y).^2) / length(y)
 end
 
@@ -138,9 +229,21 @@ Calculates the accuracy
 # Arguments
 - `y::AbstractVector`: vector of the correct target variables
 - `f_y::AbstractVector`: vector of the predicted target variables
+
+# Examples
+```julia-repl
+julia> y = [0, 1, 2, 3]; f_y = [0, 5, 2, 5];
+julia> accuracy(y, f_y)
+0.5
+```
 """
 function accuracy(y::AbstractVector, f_y::AbstractVector)
-    @assert length(y) == length(f_y)
+    if length(y) == 0 || length(f_y) == 0
+        error("y and f_y must not be empty")
+    end
+    if length(y) != length(f_y)
+        error("y and f_y must have the same length")
+    end
     sum(y .== f_y) / length(y)
 end
 
@@ -150,10 +253,23 @@ Removes dimensions that only countain one entry from an array
 
 # Arguments
 - `A::AbstractArray`: the array
+
+# Examples
+```julia-repl
+julia> A = [1 2 3;]
+1×3 Array{Int64,2}:
+ 1  2  3
+
+julia> squeeze(A)
+3-element Array{Int64,1}:
+ 1
+ 2
+ 3
+```
 """
 function squeeze(A::AbstractArray)
     singleton_dims = tuple((d for d in 1:ndims(A) if size(A, d) == 1)...)
-    return dropdims(A, dims=singleton_dims)
+    dropdims(A, dims=singleton_dims)
 end
 
 
@@ -162,24 +278,55 @@ Calculates the softmax of a vector x
 
 # Arguments
 - `x::AbstractVector`: the vector x
+
+# Examples
+```julia-repl
+julia> x = [-2, 0, 2];
+julia> softmax(x)
+3-element Array{Float64,1}:
+ 0.015876239976466765
+ 0.11731042782619838 
+ 0.8668133321973349
+julia> sum(softmax(x))
+1.0
+```
 """
 function softmax(x::AbstractVector)
+    if length(x) == 0
+        error("x must not be empty")
+    end
     e = exp.(x .- maximum(x))
     e / sum(e)
 end
 
 
 """
-Defines a convergence criterion based on a list of previous accuracies. If there was no
-improvement larger than a threshold in the last k rounds, return true
+Defines a convergence criterion based on an array of previous accuracies. If there was no
+improvement larger than a threshold in the last k rounds, return false
 
 # Arguments
-- `accuracies::AbstractVector`: the list of accuracies
+- `accuracies::AbstractVector`: the array of accuracies
 - `number_iterations::UInt=10`: how many iterations should be taken into consideration
 - `threshold::Float64=0.001`: minimal improvement that has to be achieved in the last k rounds
+
+# Examples
+```julia-repl
+julia> accuracies = [0.90, 0.88, 0.93, 0.92, 0.92, 0.91, 0.92, 0.93];
+julia> not_converged(accuracies, number_iterations=5, threshold=0.05)
+false
+julia> not_converged(accuracies, number_iterations=8, threshold=0.05)
+true
+julia> not_converged(accuracies, number_iterations=5, threshold=0.02)
+true
+```
 """
 function not_converged(accuracies::AbstractVector; number_iterations::Int64=10, threshold::Float64=0.001)
-    @assert 0 < threshold < 1
+    if number_iterations <= 0
+        error("number_iterations must be positive")
+    end
+    if !(0 < threshold < 1)
+        error("threshold must be in (0,1)")
+    end
     if length(accuracies) >= number_iterations && (accuracies[end] - minimum(accuracies[end-(number_iterations-1):end-1]) < threshold)
         return false
     end
