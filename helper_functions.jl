@@ -205,6 +205,103 @@ function k_fold(X::AbstractArray, y::AbstractVector, K::Int64; shuffle::Bool=fal
     output
     
 end
+
+
+"""
+Creates batches of an array of indices
+
+# Arguments
+- `indices::AbstractVector`: the array to batchify
+- `K::Int64`: the length of one batch
+- `shuffle::Bool=false`: if true, the array is shuffled before being batchified
+
+# Examples
+```julia-repl
+julia> indices = 1:10;
+julia> batchify_indices(indices, 3)
+4-element Array{UnitRange{Int64},1}:
+ 1:3  
+ 4:6  
+ 7:9  
+ 10:10
+```
+"""
+function batchify_indices(indices::AbstractVector, K::Int64; shuffle::Bool=false)
+
+    n = length(indices)
+    if n == 0
+        error("indices must not be empty")
+    end
+    if !(1 <= K <= n)
+        error("K must be in [1, length(indices)]")
+    end
+
+    indices_copy = shuffle ? Random.shuffle(indices) : deepcopy(indices)
+
+    [indices_copy[i:min(i+K-1,n)] for i in 1:K:n]
+
+end
+
+
+"""
+Creates batches of a range from 1 to n
+
+# Arguments
+- `n::Int64`: the end of the range
+- `K::Int64`: the length of one batch
+- `shuffle::Bool=false`: if true, the range is shuffled before being batchified
+
+# Examples
+```julia-repl
+julia> batchify_indices(10, 3)
+4-element Array{UnitRange{Int64},1}:
+ 1:3  
+ 4:6  
+ 7:9  
+ 10:10
+```
+"""
+function batchify_indices(n::Int64, K::Int64; shuffle::Bool=false)
+    if n < 1
+        error("n must be positive")
+    end
+    batchify_indices(1:n, K; shuffle=shuffle)
+end
+
+
+"""
+Creates batches for the dataset (X,y)
+
+# Arguments
+- `X::AbstractArray`: stacked matrix of input variables
+- `y::AbstractVector`: vector of output variables
+- `K::Int64`: the length of one batch
+- `shuffle::Bool=false`: if true, the range is shuffled before being batchified
+
+# Examples
+```julia-repl
+julia> X = [1 2 3; 4 5 6; 7 8 9; 10 11 12]; y = [13, 14, 15, 16];
+julia> batchify(X, y, 2)
+2-element Array{Array{Array{Int64,N} where N,1},1}:
+ [[1 2 3; 4 5 6], [13, 14]]   
+ [[7 8 9; 10 11 12], [15, 16]]
+```
+"""
+function batchify(X::AbstractArray, y::AbstractVector, K::Int64; shuffle::Bool=false)
+
+    if size(X)[1] != length(y)
+        error("number of rows of X must be equal to the length of y")
+    end
+    if !(1 <= K <= length(y))
+        error("K must be in [1, length(y)]")
+    end
+
+    X_copy = deepcopy(X)
+    y_copy = deepcopy(y)
+
+    [[X_copy[batch_indices, :], y_copy[batch_indices]] for batch_indices in batchify_indices(length(y), K, shuffle=shuffle)]
+
+end
     
 
 """
@@ -306,6 +403,62 @@ function softmax(x::AbstractVector)
     end
     e = exp.(x .- maximum(x))
     e / sum(e)
+end
+
+
+"""
+Calculates the logistic function at x
+
+# Arguments
+- `x::Float64`: the value of x
+
+# Examples
+```julia-repl
+julia> logistic(0.0)
+0.5
+```
+"""
+function logistic(x::Float64)
+    1.0 / (1-0 + exp(-x))
+end
+
+
+"""
+Calculates the derivative of the logistic function at x
+
+# Arguments
+- `x::Float64`: the value of x
+
+# Examples
+```julia-repl
+julia> logistic_prime(0.0)
+0.25
+```
+"""
+function logistic_prime(x::Float64)
+    logistic(x) * (1 - logistic(x))
+end
+
+
+"""
+Calculates the outer product of two vectors
+
+# Arguments
+- `x::AbstractVector`: the first vector x
+- `y::AbstractVector`: the second vector y
+
+# Examples
+```julia-repl
+julia> x = [3, 2, 4]; y = [2, 4, 3];
+julia> outer(x, y)
+3×3 Array{Int64,2}:
+ 6  12   9
+ 4   8   6
+ 8  16  12
+```
+"""
+function outer(x::AbstractVector, y::AbstractVector)
+    x .* y'
 end
 
 
