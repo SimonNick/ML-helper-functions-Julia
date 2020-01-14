@@ -9,3 +9,4 @@ Some helper functions that you often need when doing ML using Julia, including
 - squeeze function
 - outer product
 - function which defines a simple convergence criterion
+- function which produces a confusion matrix
