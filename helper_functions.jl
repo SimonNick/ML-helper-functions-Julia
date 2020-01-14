@@ -495,4 +495,42 @@ function not_converged(accuracies::AbstractVector; number_iterations::Int64=10, 
     true
 end
 
+
+"""
+Calculates the confusion matrix for a given test set, where the (i,j) entry denotes the number of samples with true label i
+and (misclassified) predicted class j.
+
+# Arguments
+- `class_labels::AbstractVector{Int64}`: the array of correct class labels
+- `predictions::AbstractVector{Int64}`: the array of predicted class labels
+- `number_classes::Int64`: the total number of classes
+- `include_correct_predictions::Bool=false`: if true, also the number of correct predictions are shown on the diagonal of the matrix
+
+# Examples
+```julia-repl
+julia> class_labels = [1, 1, 2, 1, 2]; predictions = [1, 2, 1, 1, 1];
+julia> confusion_matrix(class_labels, predictions, 2)
+2×2 Array{Int64,2}:
+ 0  1
+ 2  0
+julia> confusion_matrix(class_labels, predictions, 2; include_correct_predictions=true)
+2×2 Array{Int64,2}:
+ 2  1
+ 2  0
+```
+"""
+function confusion_matrix(class_labels::AbstractVector{Int64}, predictions::AbstractVector{Int64}, number_classes::Int64; include_correct_predictions::Bool=false)
+    confusion_matrix = zeros(Int, number_classes, number_classes)
+    for (i,y) in enumerate(class_labels)
+        y_hat = predictions[i]
+        if y_hat != y
+            confusion_matrix[y, y_hat] += 1
+        elseif include_correct_predictions
+            confusion_matrix[y,y] += 1
+        end
+    end
+    return confusion_matrix
+end
+
+
 nothing
